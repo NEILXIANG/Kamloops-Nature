@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NUMI · 九宫消</title>
+<meta name="description" content="数独 × 俄罗斯方块。放数字到 9×9 棋盘，填满一行、一列或一宫就消除。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#0b1210;--surface:#141b18;--surface-2:#1d2622;--line:#2a3530;--line-2:#38463f;
+  --ink:#eaf0eb;--muted:#8ea499;--primary:#5cbf8e;--primary-soft:rgba(92,191,142,.14);--primary-ink:#07120d;
+  --danger:#e86a5f;
+  --c1:#f08a84;--c2:#f2a258;--c3:#eecd62;--c4:#88c977;--c5:#5bbfc9;--c6:#6b9bf0;--c7:#a593f5;--c8:#e8a0c3;--c9:#9eacb0;
+  --f:'Inter','Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'JetBrains Mono','SF Mono',Consolas,ui-monospace,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);height:100%;overflow:hidden;overscroll-behavior:none;touch-action:manipulation}
+body{display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button{font-family:inherit}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:460px;padding:14px 20px 8px;flex:none}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand strong{font-weight:700;font-size:18px;letter-spacing:.22em}
+.brand .m{font-weight:400;color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.actions{display:flex;gap:8px;align-items:center}
+.lang{display:inline-flex;background:var(--surface);border-radius:16px;overflow:hidden;height:32px;padding:3px}
+.lang button{font:600 11.5px var(--f);padding:0 10px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:13px;letter-spacing:.04em}
+.lang button[aria-pressed=true]{background:var(--surface-2);color:var(--primary)}
+.icon-btn{width:32px;height:32px;border:0;background:var(--surface);border-radius:16px;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.icon-btn:hover{color:var(--ink);background:var(--surface-2)}
+.icon-btn svg{width:16px;height:16px;fill:currentColor}
+
+/* ---------- scores ---------- */
+.scores{display:flex;gap:28px;align-items:flex-end;width:100%;max-width:460px;padding:0 20px 10px;position:relative}
+.scores .s{display:flex;flex-direction:column;gap:2px}
+.scores .lbl{font-size:10.5px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-weight:500}
+.scores .val{font:700 28px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.scores .val.best{font-size:18px;color:var(--muted);font-weight:600}
+.scores .combo{position:absolute;right:20px;bottom:10px;color:var(--primary);font:700 22px/1 var(--mono);opacity:0;transform:translateY(6px);transition:all .25s cubic-bezier(.3,1.4,.5,1)}
+.scores .combo.on{opacity:1;transform:translateY(0)}
+
+/* ---------- main ---------- */
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;padding:4px 20px 10px;max-width:460px;min-height:0;gap:16px}
+
+.board{display:grid;grid-template-columns:repeat(9,1fr);width:100%;aspect-ratio:1;background:var(--line);border-radius:14px;overflow:hidden;position:relative;padding:2px;gap:1px}
+.board::after{content:"";position:absolute;inset:2px;pointer-events:none;z-index:5;background:
+ linear-gradient(90deg,transparent calc(100%/3 - 1px),var(--line-2) calc(100%/3 - 1px) calc(100%/3 + 1px),transparent calc(100%/3 + 1px) calc(200%/3 - 1px),var(--line-2) calc(200%/3 - 1px) calc(200%/3 + 1px),transparent calc(200%/3 + 1px)),
+ linear-gradient(0deg,transparent calc(100%/3 - 1px),var(--line-2) calc(100%/3 - 1px) calc(100%/3 + 1px),transparent calc(100%/3 + 1px) calc(200%/3 - 1px),var(--line-2) calc(200%/3 - 1px) calc(200%/3 + 1px),transparent calc(200%/3 + 1px))}
+.cell{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;font:700 clamp(16px,4.6vw,22px) var(--mono);background:var(--bg);cursor:pointer;transition:background .15s;font-variant-numeric:tabular-nums}
+
+.cell[data-n="1"]{color:var(--c1)} .cell[data-n="2"]{color:var(--c2)} .cell[data-n="3"]{color:var(--c3)}
+.cell[data-n="4"]{color:var(--c4)} .cell[data-n="5"]{color:var(--c5)} .cell[data-n="6"]{color:var(--c6)}
+.cell[data-n="7"]{color:var(--c7)} .cell[data-n="8"]{color:var(--c8)} .cell[data-n="9"]{color:var(--c9)}
+
+.cell.legal{background:var(--primary-soft)}
+.cell.preview{background:var(--primary-soft);box-shadow:inset 0 0 0 2px var(--primary) !important}
+.cell.invalid{box-shadow:inset 0 0 0 2px var(--danger) !important;animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.cell.pop{animation:pop .4s cubic-bezier(.3,1.4,.5,1)}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.cell.clearing{animation:clear .55s cubic-bezier(.4,0,.2,1) forwards;z-index:2}
+@keyframes clear{
+  0%{background:var(--primary);color:var(--primary-ink);transform:scale(1);box-shadow:0 0 20px rgba(92,191,142,.6)}
+  60%{background:var(--primary);color:var(--primary-ink);transform:scale(1.08)}
+  100%{background:var(--bg);color:transparent;transform:scale(1);box-shadow:none}
+}
+
+/* ---------- pieces ---------- */
+.pieces{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
+.piece{aspect-ratio:1;background:var(--surface);border-radius:14px;display:flex;align-items:center;justify-content:center;font:700 clamp(32px,10vw,42px) var(--mono);cursor:pointer;transition:transform .2s cubic-bezier(.3,1.4,.5,1),box-shadow .2s,background .2s,opacity .3s;border:2px solid transparent;position:relative;font-variant-numeric:tabular-nums;user-select:none}
+.piece[data-n="1"]{color:var(--c1)} .piece[data-n="2"]{color:var(--c2)} .piece[data-n="3"]{color:var(--c3)}
+.piece[data-n="4"]{color:var(--c4)} .piece[data-n="5"]{color:var(--c5)} .piece[data-n="6"]{color:var(--c6)}
+.piece[data-n="7"]{color:var(--c7)} .piece[data-n="8"]{color:var(--c8)} .piece[data-n="9"]{color:var(--c9)}
+.piece.sel{background:var(--surface-2);border-color:var(--primary);transform:scale(1.06) translateY(-2px);box-shadow:0 6px 24px rgba(92,191,142,.25),0 0 0 4px var(--primary-soft)}
+.piece.used{opacity:.18;transform:scale(.9);pointer-events:none}
+.piece.dead{opacity:.35;filter:grayscale(1)}
+.piece .k{position:absolute;top:6px;right:9px;font:500 10px var(--mono);color:var(--muted);opacity:.6}
+
+.hint{text-align:center;color:var(--muted);font-size:12.5px;min-height:18px;letter-spacing:.02em;padding:0 20px}
+
+/* ---------- overlay dialogs ---------- */
+.ovl{position:fixed;inset:0;background:rgba(8,12,10,.84);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:20;padding:24px;animation:fade .25s ease-out}
+.ovl.on{display:flex}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.card{background:var(--surface);border-radius:22px;padding:28px 24px 22px;max-width:380px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.4);animation:rise .35s cubic-bezier(.3,1.4,.5,1)}
+@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.card h2{margin:0 0 6px;font-size:22px;font-weight:600;text-align:center;letter-spacing:.02em}
+.card .lead{margin:0;color:var(--muted);font-size:13.5px;text-align:center}
+.card .big{font:700 56px/1 var(--mono);color:var(--primary);text-align:center;margin:18px 0 6px;letter-spacing:-.02em}
+.card .caption{text-align:center;font-size:12px;color:var(--muted);margin:0 0 14px;letter-spacing:.04em;text-transform:uppercase}
+.card .mini{font:500 10.5px var(--mono);color:var(--muted);margin:14px 0;letter-spacing:.08em;white-space:pre;line-height:1.25;text-align:center;background:var(--surface-2);padding:12px;border-radius:10px;overflow-x:auto}
+.rules{color:var(--ink);font-size:13.5px;line-height:1.6;margin:14px 0;padding:0}
+.rules li{list-style:none;padding:6px 0 6px 24px;position:relative}
+.rules li::before{content:"";position:absolute;left:4px;top:14px;width:6px;height:6px;background:var(--primary);border-radius:50%}
+.btn-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:46px;padding:0 22px;border:0;border-radius:23px;background:var(--primary);color:var(--primary-ink);font:600 15px var(--f);cursor:pointer;letter-spacing:.02em;transition:transform .1s,filter .15s}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:scale(.97)}
+.btn.g{background:transparent;color:var(--ink);border:1px solid var(--line-2)}
+.btn.g:hover{background:var(--surface-2)}
+
+/* ---------- very narrow ---------- */
+@media (max-width:360px){
+  header{padding:10px 14px 6px}
+  main{padding:0 14px 8px}
+  .scores{padding:0 14px 8px;gap:20px}
+  .pieces{gap:10px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><strong>N<span style="color:var(--primary)">U</span>MI</strong><span class="m" id="brand-sub"></span></div>
+  <div class="actions">
+    <button class="icon-btn" id="help-btn" aria-label="?"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 15.5a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm1.5-5.2c-.6.4-.7.6-.7 1.2v.3a.8.8 0 0 1-1.6 0v-.3c0-1.3.5-2 1.4-2.6.6-.4.9-.7.9-1.3 0-.8-.6-1.3-1.4-1.3-.9 0-1.4.5-1.6 1.3a.8.8 0 0 1-1.6-.3C9.3 7.9 10.4 7 12 7c1.7 0 3 1 3 2.7 0 1.2-.5 1.9-1.5 2.6z"/></svg></button>
+    <button class="icon-btn" id="restart-btn" aria-label="↻"><svg viewBox="0 0 24 24"><path d="M12 5V2L7 7l5 5V8a6 6 0 1 1-5.6 8.1l-1.9.8A8 8 0 1 0 12 5z"/></svg></button>
+    <div class="lang" role="group">
+      <button type="button" id="l-zh" aria-pressed="true">中</button>
+      <button type="button" id="l-en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</header>
+
+<div class="scores">
+  <div class="s"><span class="lbl" id="lbl-score"></span><b class="val" id="score">0</b></div>
+  <div class="s"><span class="lbl" id="lbl-best"></span><b class="val best" id="best">0</b></div>
+  <b class="combo" id="combo">×2</b>
+</div>
+
+<main>
+  <div class="board" id="board"></div>
+  <div class="pieces" id="pieces"></div>
+</main>
+
+<div class="hint" id="hint"></div>
+
+<div class="ovl on" id="start">
+  <div class="card">
+    <h2 id="t-title">NUMI</h2>
+    <p class="lead" id="t-sub"></p>
+    <ul class="rules" id="t-rules"></ul>
+    <div class="btn-row"><button class="btn" id="t-start"></button></div>
+  </div>
+</div>
+
+<div class="ovl" id="over">
+  <div class="card">
+    <h2 id="o-title"></h2>
+    <div class="big" id="o-score">0</div>
+    <p class="caption" id="o-caption"></p>
+    <p class="lead" id="o-sub"></p>
+    <div class="mini" id="o-share"></div>
+    <div class="btn-row">
+      <button class="btn" id="o-again"></button>
+      <button class="btn g" id="o-copy"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const T = {
+  zh: {
+    brandSub: '九宫消',
+    score: '分数',
+    best: '最佳',
+    hintTap: '点一个数字，再点棋盘的空格',
+    hintPlace: '点任意空格 — 同行、同列、同宫不能重复',
+    hintCombo: '连击！',
+    title: 'NUMI',
+    sub: '数独 × 俄罗斯方块',
+    rules: [
+      '把 1–9 的数字放到 9×9 棋盘。',
+      '遵守数独规则：同一行、同一列、同一宫内，数字不能重复。',
+      '一个行、列或宫凑齐 1–9 时整条消除。',
+      '连续消除有倍率奖励。',
+      '剩下的数字都放不下时，游戏结束。'
+    ],
+    start: '开始',
+    over: '游戏结束',
+    overSub: '没有能放的位置了',
+    overCaption: '本局得分',
+    again: '再来一局',
+    copy: '复制结果',
+    copied: '已复制',
+    scored: s => `NUMI · 我得了 ${s} 分`,
+  },
+  en: {
+    brandSub: 'Nine-grid pop',
+    score: 'Score',
+    best: 'Best',
+    hintTap: 'Pick a number, then tap an empty cell',
+    hintPlace: 'Tap any empty cell — no duplicates in row, column, or box',
+    hintCombo: 'Combo!',
+    title: 'NUMI',
+    sub: 'Sudoku × Tetris',
+    rules: [
+      'Place numbers 1–9 on a 9×9 grid.',
+      'Sudoku rule: no duplicate numbers in the same row, column, or 3×3 box.',
+      'When a row, column, or box holds all of 1–9, it clears.',
+      'Multiple clears in a row give a combo multiplier.',
+      'Game ends when none of your remaining pieces can be placed.'
+    ],
+    start: 'Start',
+    over: 'Game Over',
+    overSub: 'No legal moves left',
+    overCaption: 'Final score',
+    again: 'Play again',
+    copy: 'Copy result',
+    copied: 'Copied',
+    scored: s => `NUMI · I scored ${s}`,
+  }
+};
+let lang = (navigator.language || 'zh').startsWith('en') ? 'en' : 'zh';
+const L = () => T[lang];
+const $ = id => document.getElementById(id);
+
+const SIZE = 9;
+let board, pieces, score, best, combo, selected, gameOver, maxBoard, animating;
+
+function emptyBoard(){ return Array.from({length:SIZE},()=>Array(SIZE).fill(0)); }
+
+function init(){
+  board = emptyBoard();
+  maxBoard = emptyBoard();
+  pieces = genPieces();
+  score = 0;
+  combo = 0;
+  selected = -1;
+  gameOver = false;
+  animating = false;
+  best = +(localStorage.getItem('numi-best')||0);
+  buildBoard();
+  render();
+}
+
+function buildBoard(){
+  const bd = $('board');
+  bd.innerHTML = '';
+  for(let i=0;i<81;i++){
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.dataset.r = Math.floor(i/9);
+    d.dataset.c = i%9;
+    d.addEventListener('click', onCellClick);
+    d.addEventListener('pointerenter', onCellHover);
+    d.addEventListener('pointerleave', onCellLeave);
+    bd.appendChild(d);
+  }
+}
+
+function canPlace(r,c,num){
+  if(board[r][c] !== 0) return false;
+  for(let j=0;j<9;j++) if(board[r][j] === num) return false;
+  for(let i=0;i<9;i++) if(board[i][c] === num) return false;
+  const br = (r/3|0)*3, bc = (c/3|0)*3;
+  for(let i=br;i<br+3;i++) for(let j=bc;j<bc+3;j++) if(board[i][j] === num) return false;
+  return true;
+}
+
+function hasAnyLegal(num){
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(canPlace(r,c,num)) return true;
+  return false;
+}
+
+function genPieces(){
+  const legal = [];
+  for(let n=1;n<=9;n++) if(hasAnyLegal(n)) legal.push(n);
+  const out = [];
+  for(let k=0;k<3;k++){
+    out.push(legal.length ? legal[Math.random()*legal.length|0] : 1 + (Math.random()*9|0));
+  }
+  return out;
+}
+
+function findClears(){
+  const out = [];
+  for(let r=0;r<9;r++){
+    const nz = board[r].filter(x => x!==0);
+    if(nz.length === 9 && new Set(nz).size === 9) out.push({type:'row', idx:r});
+  }
+  for(let c=0;c<9;c++){
+    const col = Array.from({length:9},(_,i)=>board[i][c]);
+    const nz = col.filter(x=>x!==0);
+    if(nz.length === 9 && new Set(nz).size === 9) out.push({type:'col', idx:c});
+  }
+  for(let b=0;b<9;b++){
+    const br = (b/3|0)*3, bc = (b%3)*3;
+    const cells = [];
+    for(let i=br;i<br+3;i++) for(let j=bc;j<bc+3;j++) cells.push(board[i][j]);
+    const nz = cells.filter(x=>x!==0);
+    if(nz.length === 9 && new Set(nz).size === 9) out.push({type:'box', idx:b});
+  }
+  return out;
+}
+
+function cellsFromClears(clears){
+  const cells = new Set();
+  clears.forEach(({type,idx}) => {
+    if(type === 'row') for(let j=0;j<9;j++) cells.add(idx*9+j);
+    else if(type === 'col') for(let i=0;i<9;i++) cells.add(i*9+idx);
+    else {
+      const br = (idx/3|0)*3, bc = (idx%3)*3;
+      for(let i=br;i<br+3;i++) for(let j=bc;j<bc+3;j++) cells.add(i*9+j);
+    }
+  });
+  return cells;
+}
+
+function place(r,c,pIdx){
+  if(gameOver || animating) return false;
+  const num = pieces[pIdx];
+  if(num == null) return false;
+  if(!canPlace(r,c,num)){
+    const el = $('board').children[r*9+c];
+    el.classList.remove('invalid'); void el.offsetWidth; el.classList.add('invalid');
+    setTimeout(()=>el.classList.remove('invalid'),300);
+    return false;
+  }
+  board[r][c] = num;
+  maxBoard[r][c] = num;
+  pieces[pIdx] = null;
+  selected = -1;
+
+  // animate placement
+  render();
+  const el = $('board').children[r*9+c];
+  el.classList.add('pop');
+  el.addEventListener('animationend', ()=>el.classList.remove('pop'), {once:true});
+
+  const clears = findClears();
+  if(clears.length > 0){
+    combo++;
+    const base = 20 * clears.length;
+    score += base * combo + (combo>1 ? 50*(combo-1) : 0);
+    showCombo();
+    animating = true;
+    const cells = cellsFromClears(clears);
+    cells.forEach(k => {
+      const e = $('board').children[k];
+      e.classList.add('clearing');
+    });
+    setTimeout(() => {
+      cells.forEach(k => {
+        const r2 = (k/9|0), c2 = k%9;
+        board[r2][c2] = 0;
+        $('board').children[k].classList.remove('clearing');
+      });
+      if(pieces.every(p => p === null)) pieces = genPieces();
+      animating = false;
+      render();
+      if(score > best){ best = score; localStorage.setItem('numi-best', String(best)); render(); }
+      checkEnd();
+    }, 550);
+  } else {
+    combo = 0;
+    score += 1;
+    if(pieces.every(p => p === null)) pieces = genPieces();
+    render();
+    if(score > best){ best = score; localStorage.setItem('numi-best', String(best)); render(); }
+    checkEnd();
+  }
+  return true;
+}
+
+function checkEnd(){
+  if(gameOver) return;
+  const alive = pieces.filter(p => p !== null);
+  if(alive.length === 0) return;
+  if(!alive.some(p => hasAnyLegal(p))){
+    gameOver = true;
+    setTimeout(showGameOver, 350);
+  }
+}
+
+function showCombo(){
+  if(combo < 2) return;
+  const el = $('combo');
+  el.textContent = '×' + combo;
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  setTimeout(() => el.classList.remove('on'), 1200);
+}
+
+function render(){
+  $('score').textContent = score;
+  $('best').textContent = best;
+  const bd = $('board');
+  const highlight = selected >= 0 && pieces[selected] != null;
+  for(let i=0;i<81;i++){
+    const r = (i/9|0), c = i%9;
+    const el = bd.children[i];
+    const n = board[r][c];
+    el.textContent = n > 0 ? n : '';
+    el.dataset.n = n || '';
+    el.classList.remove('legal');
+    if(highlight && n === 0 && canPlace(r,c,pieces[selected])) el.classList.add('legal');
+  }
+  const pb = $('pieces');
+  pb.innerHTML = '';
+  pieces.forEach((p,i) => {
+    const d = document.createElement('div');
+    const dead = p !== null && !hasAnyLegal(p);
+    d.className = 'piece' + (selected === i ? ' sel' : '') + (p === null ? ' used' : '') + (dead ? ' dead' : '');
+    if(p !== null){
+      d.textContent = p;
+      d.dataset.n = p;
+      const k = document.createElement('span');
+      k.className = 'k'; k.textContent = i+1;
+      d.appendChild(k);
+      d.addEventListener('click', () => selectPiece(i));
+    }
+    pb.appendChild(d);
+  });
+  $('hint').textContent = selected < 0 ? L().hintTap : L().hintPlace;
+}
+
+function selectPiece(i){
+  if(gameOver || animating) return;
+  if(pieces[i] == null) return;
+  selected = selected === i ? -1 : i;
+  render();
+}
+
+function onCellClick(e){
+  if(gameOver || animating) return;
+  const r = +e.currentTarget.dataset.r, c = +e.currentTarget.dataset.c;
+  if(selected < 0){
+    // allow tapping an empty cell with a filled one to peek — not required.
+    return;
+  }
+  place(r,c,selected);
+}
+
+function onCellHover(e){
+  if(gameOver || animating || selected < 0) return;
+  const r = +e.currentTarget.dataset.r, c = +e.currentTarget.dataset.c;
+  if(board[r][c] !== 0) return;
+  const ok = canPlace(r,c,pieces[selected]);
+  e.currentTarget.classList.add(ok ? 'preview' : 'invalid');
+}
+
+function onCellLeave(e){
+  e.currentTarget.classList.remove('preview','invalid');
+}
+
+function shareText(){
+  const map = ['⬛','🟥','🟧','🟨','🟩','🟦','🟪','🟫','🟩','⬜'];
+  let out = `${L().scored(score)}\n`;
+  for(let r=0;r<9;r++){
+    for(let c=0;c<9;c++) out += map[maxBoard[r][c]];
+    out += '\n';
+  }
+  return out;
+}
+
+function showGameOver(){
+  $('o-title').textContent = L().over;
+  $('o-caption').textContent = L().overCaption;
+  $('o-score').textContent = score;
+  $('o-sub').textContent = L().overSub;
+  $('o-share').textContent = shareText();
+  $('o-again').textContent = L().again;
+  $('o-copy').textContent = L().copy;
+  $('over').classList.add('on');
+}
+
+/* ---------- language ---------- */
+function applyLang(){
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  const l = L();
+  $('l-zh').setAttribute('aria-pressed', String(lang==='zh'));
+  $('l-en').setAttribute('aria-pressed', String(lang==='en'));
+  $('brand-sub').textContent = l.brandSub;
+  $('lbl-score').textContent = l.score;
+  $('lbl-best').textContent = l.best;
+  $('t-title').textContent = l.title;
+  $('t-sub').textContent = l.sub;
+  $('t-rules').innerHTML = l.rules.map(r => `<li>${r}</li>`).join('');
+  $('t-start').textContent = l.start;
+  render();
+}
+
+$('l-zh').onclick = () => { lang = 'zh'; applyLang(); };
+$('l-en').onclick = () => { lang = 'en'; applyLang(); };
+$('t-start').onclick = () => $('start').classList.remove('on');
+$('help-btn').onclick = () => $('start').classList.add('on');
+$('restart-btn').onclick = () => { init(); render(); };
+$('o-again').onclick = () => { $('over').classList.remove('on'); init(); };
+$('o-copy').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(shareText());
+    $('o-copy').textContent = L().copied;
+    setTimeout(() => { $('o-copy').textContent = L().copy; }, 1500);
+  } catch(e) {}
+};
+
+/* ---------- keyboard ---------- */
+window.addEventListener('keydown', e => {
+  if(gameOver || animating) return;
+  if(e.key >= '1' && e.key <= '3') selectPiece(+e.key - 1);
+  if(e.key === 'Escape') selected = -1, render();
+});
+
+init();
+applyLang();
+</script>
+</body>
+</html>

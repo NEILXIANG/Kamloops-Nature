@@ -1,0 +1,14 @@
+name = "risk-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# KV namespace: create with `wrangler kv namespace create LAYERS` and paste the id here
+[[kv_namespaces]]
+binding = "LAYERS"
+id = "REPLACE_WITH_KV_ID"
+
+# Every 48 hours (00:00 UTC on even days of the month). Change to "*/15 * * * *" for 15-minute refresh.
+[triggers]
+crons = ["0 0 */2 * *"]
+
+# Optional secret for NASA FIRMS: `wrangler secret put FIRMS_MAP_KEY`

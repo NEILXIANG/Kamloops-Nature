@@ -1,0 +1,5 @@
+work/
+dist/_preview.html
+__pycache__/
+*.png
+!docs/screenshots/*.png

@@ -1,0 +1,5 @@
+.kn.part*
+.DS_Store
+__pycache__/
+node_modules/
+private/
